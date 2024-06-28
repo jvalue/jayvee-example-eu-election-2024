@@ -1,0 +1,22 @@
+publish transform VoterDiff {
+    from party2024 oftype integer;
+    from party2019 oftype integer;
+    to partyDiff oftype integer;
+
+    partyDiff: party2024 - party2019;
+}
+
+publish transform VoterPercentage {
+    from party2019 oftype integer;
+    from partyDiff oftype integer;
+    to partyPercentage oftype decimal;
+
+    partyPercentage: round((partyDiff / party2019) * 100);
+}
+
+constraint BavarianCIN on text: value matches /^09[0-9]{3}$/;
+publish valuetype BavarianCommunityIdentificationNumber oftype text {
+    constraints: [
+        BavarianCIN
+    ];
+}

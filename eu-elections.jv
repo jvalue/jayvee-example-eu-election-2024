@@ -1,0 +1,154 @@
+use {
+    VoterDiff,
+    VoterPercentage,
+    BavarianCommunityIdentificationNumber
+} from "./util.jv";
+
+pipeline EuElectionsGermany {
+    GermanResultsFile
+        -> InterpretAsText
+        -> RemoveComments
+        -> ParseAsCSV
+        -> WriteRegionHeader
+        -> WritePartyHeaders
+        -> ParseAsTable
+        -> CSUDiff
+        -> GrueneDiff
+        -> SPDDiff
+        -> AfDDiff
+        -> CSUPercentage
+        -> GruenePercentage
+        -> SPDPercentage
+        -> AfDPercentage
+        -> LoadIntoSQLite;
+
+
+    block GermanResultsFile oftype HttpExtractor {
+        url: "https://www.bundeswahlleiterin.de/europawahlen/2024/ergebnisse/opendata/ew24/csv/kerg.csv";
+    }
+
+    block InterpretAsText oftype TextFileInterpreter { }
+
+    block RemoveComments oftype TextRangeSelector {
+        lineFrom: 5;
+        lineTo: 436;
+    }
+
+    block ParseAsCSV oftype CSVInterpreter {
+        delimiter: ";";
+    }
+
+    block WriteRegionHeader oftype CellWriter {
+        at: range A1:B1;
+        write: [
+            "Id",
+            "Region"
+        ];
+    }
+
+    block WritePartyHeaders oftype CellWriter {
+        at: range N1:U1;
+        write: [
+            "Grüne 2024",
+            "Grüne 2019",
+            "SPD 2024",
+            "SPD 2019",
+            "AfD 2024",
+            "AfD 2019",
+            "CSU 2024",
+            "CSU 2019",
+        ];
+    }
+
+    block ParseAsTable oftype TableInterpreter {
+        header: true;
+        columns: [
+            "Id" oftype BavarianCommunityIdentificationNumber,
+            "Region" oftype text,
+            "Grüne 2024" oftype integer,
+            "Grüne 2019" oftype integer,
+            "SPD 2024" oftype integer,
+            "SPD 2019" oftype integer,
+            "AfD 2024" oftype integer,
+            "AfD 2019" oftype integer,
+            "CSU 2024" oftype integer,
+            "CSU 2019" oftype integer
+        ];
+    }
+
+    block CSUDiff oftype TableTransformer {
+        inputColumns: [
+            "CSU 2024",
+            "CSU 2019"
+        ];
+        outputColumn: "CSU Diff";
+        uses: VoterDiff;
+    }
+
+    block GrueneDiff oftype TableTransformer {
+        inputColumns: [
+            "Grüne 2024",
+            "Grüne 2019"
+        ];
+        outputColumn: "Grüne Diff";
+        uses: VoterDiff;
+    }
+
+    block SPDDiff oftype TableTransformer {
+        inputColumns: [
+            "SPD 2024",
+            "SPD 2019"
+        ];
+        outputColumn: "SPD Diff";
+        uses: VoterDiff;
+    }
+
+    block AfDDiff oftype TableTransformer {
+        inputColumns: [
+            "AfD 2024",
+            "AfD 2019"
+        ];
+        outputColumn: "AfD Diff";
+        uses: VoterDiff;
+    }
+
+    block CSUPercentage oftype TableTransformer {
+        inputColumns: [
+            "CSU 2019",
+            "CSU Diff"
+        ];
+        outputColumn: "CSU Diff (%)";
+        uses: VoterPercentage;
+    }
+    block GruenePercentage oftype TableTransformer {
+        inputColumns: [
+            "Grüne 2019",
+            "Grüne Diff"
+        ];
+        outputColumn: "Grüne Diff (%)";
+        uses: VoterPercentage;
+    }
+
+    block SPDPercentage oftype TableTransformer {
+        inputColumns: [
+            "SPD 2019",
+            "SPD Diff"
+        ];
+        outputColumn: "SPD Diff (%)";
+        uses: VoterPercentage;
+    }
+
+    block AfDPercentage oftype TableTransformer {
+        inputColumns: [
+            "AfD 2019",
+            "AfD Diff"
+        ];
+        outputColumn: "AfD Diff (%)";
+        uses: VoterPercentage;
+    }
+
+    block LoadIntoSQLite oftype SQLiteLoader {
+        table: "elections2019_2024";
+        file: "./eu-elections.sqlite";
+    }
+}
